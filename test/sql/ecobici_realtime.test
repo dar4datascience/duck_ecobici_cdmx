@@ -1,0 +1,64 @@
+# name: test/sql/ecobici_realtime.test
+# description: Test Ecobici real-time GBFS data functions
+# group: [ecobici]
+
+# Load the extension
+statement ok
+LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+
+# Test station status function
+query I
+SELECT COUNT(*) > 0 FROM ecobici_station_status();
+----
+true
+
+# Test that station status has expected columns
+query I
+SELECT COUNT(*) FROM (
+    SELECT station_id, num_bikes_available, num_docks_available, last_reported, is_installed, is_renting, is_returning 
+    FROM ecobici_station_status() 
+    LIMIT 1
+);
+----
+1
+
+# Test station information function
+query I
+SELECT COUNT(*) > 0 FROM ecobici_station_information();
+----
+true
+
+# Test that station information has expected columns
+query I
+SELECT COUNT(*) FROM (
+    SELECT station_id, name, lat, lon, address, capacity 
+    FROM ecobici_station_information() 
+    LIMIT 1
+);
+----
+1
+
+# Test system information function
+query I
+SELECT COUNT(*) FROM ecobici_system_information();
+----
+1
+
+# Test that system information has expected columns
+query I
+SELECT COUNT(*) FROM (
+    SELECT system_id, language, name, timezone 
+    FROM ecobici_system_information() 
+    LIMIT 1
+);
+----
+1
+
+# Test joining station info with status
+query I
+SELECT COUNT(*) > 0 
+FROM ecobici_station_information() info
+JOIN ecobici_station_status() status 
+ON info.station_id = status.station_id;
+----
+true
