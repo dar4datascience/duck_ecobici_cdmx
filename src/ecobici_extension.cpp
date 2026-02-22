@@ -6,7 +6,6 @@
 #include "duckdb/common/exception.hpp"
 #include "duckdb/function/table_function.hpp"
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"
-#include "duckdb/main/extension_util.hpp"
 #include <nlohmann/json.hpp>
 #include <sstream>
 
@@ -37,9 +36,9 @@ struct EcobiciHistoricalTripsBindData : public TableFunctionData {
 };
 
 static unique_ptr<FunctionData> EcobiciStationStatusBind(ClientContext &context, TableFunctionBindInput &input,
-                                                          vector<LogicalType> &return_types, vector<string> &names) {
+                                                         vector<LogicalType> &return_types, vector<string> &names) {
 	auto result = make_uniq<EcobiciStationStatusBindData>();
-	
+
 	names.emplace_back("station_id");
 	return_types.emplace_back(LogicalType::VARCHAR);
 	names.emplace_back("num_bikes_available");
@@ -54,10 +53,10 @@ static unique_ptr<FunctionData> EcobiciStationStatusBind(ClientContext &context,
 	return_types.emplace_back(LogicalType::BOOLEAN);
 	names.emplace_back("is_returning");
 	return_types.emplace_back(LogicalType::BOOLEAN);
-	
+
 	EcobiciAPIClient client;
 	std::string json_data = client.FetchGBFSFeed("station_status");
-	
+
 	auto parsed = json::parse(json_data);
 	if (parsed.contains("data") && parsed["data"].contains("stations")) {
 		for (const auto &station : parsed["data"]["stations"]) {
@@ -72,14 +71,14 @@ static unique_ptr<FunctionData> EcobiciStationStatusBind(ClientContext &context,
 			result->rows.push_back(std::move(row));
 		}
 	}
-	
+
 	return std::move(result);
 }
 
 static void EcobiciStationStatusFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
 	auto &data = data_p.bind_data->CastNoConst<EcobiciStationStatusBindData>();
 	idx_t count = 0;
-	
+
 	while (data.offset < data.rows.size() && count < STANDARD_VECTOR_SIZE) {
 		for (idx_t col = 0; col < output.ColumnCount(); col++) {
 			output.SetValue(col, count, data.rows[data.offset][col]);
@@ -87,14 +86,14 @@ static void EcobiciStationStatusFunction(ClientContext &context, TableFunctionIn
 		data.offset++;
 		count++;
 	}
-	
+
 	output.SetCardinality(count);
 }
 
 static unique_ptr<FunctionData> EcobiciStationInfoBind(ClientContext &context, TableFunctionBindInput &input,
-                                                        vector<LogicalType> &return_types, vector<string> &names) {
+                                                       vector<LogicalType> &return_types, vector<string> &names) {
 	auto result = make_uniq<EcobiciStationInfoBindData>();
-	
+
 	names.emplace_back("station_id");
 	return_types.emplace_back(LogicalType::VARCHAR);
 	names.emplace_back("name");
@@ -107,10 +106,10 @@ static unique_ptr<FunctionData> EcobiciStationInfoBind(ClientContext &context, T
 	return_types.emplace_back(LogicalType::VARCHAR);
 	names.emplace_back("capacity");
 	return_types.emplace_back(LogicalType::INTEGER);
-	
+
 	EcobiciAPIClient client;
 	std::string json_data = client.FetchGBFSFeed("station_information");
-	
+
 	auto parsed = json::parse(json_data);
 	if (parsed.contains("data") && parsed["data"].contains("stations")) {
 		for (const auto &station : parsed["data"]["stations"]) {
@@ -124,14 +123,14 @@ static unique_ptr<FunctionData> EcobiciStationInfoBind(ClientContext &context, T
 			result->rows.push_back(std::move(row));
 		}
 	}
-	
+
 	return std::move(result);
 }
 
 static void EcobiciStationInfoFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
 	auto &data = data_p.bind_data->CastNoConst<EcobiciStationInfoBindData>();
 	idx_t count = 0;
-	
+
 	while (data.offset < data.rows.size() && count < STANDARD_VECTOR_SIZE) {
 		for (idx_t col = 0; col < output.ColumnCount(); col++) {
 			output.SetValue(col, count, data.rows[data.offset][col]);
@@ -139,14 +138,14 @@ static void EcobiciStationInfoFunction(ClientContext &context, TableFunctionInpu
 		data.offset++;
 		count++;
 	}
-	
+
 	output.SetCardinality(count);
 }
 
 static unique_ptr<FunctionData> EcobiciSystemInfoBind(ClientContext &context, TableFunctionBindInput &input,
-                                                       vector<LogicalType> &return_types, vector<string> &names) {
+                                                      vector<LogicalType> &return_types, vector<string> &names) {
 	auto result = make_uniq<EcobiciSystemInfoBindData>();
-	
+
 	names.emplace_back("system_id");
 	return_types.emplace_back(LogicalType::VARCHAR);
 	names.emplace_back("language");
@@ -155,10 +154,10 @@ static unique_ptr<FunctionData> EcobiciSystemInfoBind(ClientContext &context, Ta
 	return_types.emplace_back(LogicalType::VARCHAR);
 	names.emplace_back("timezone");
 	return_types.emplace_back(LogicalType::VARCHAR);
-	
+
 	EcobiciAPIClient client;
 	std::string json_data = client.FetchGBFSFeed("system_information");
-	
+
 	auto parsed = json::parse(json_data);
 	if (parsed.contains("data")) {
 		auto &data_obj = parsed["data"];
@@ -169,14 +168,14 @@ static unique_ptr<FunctionData> EcobiciSystemInfoBind(ClientContext &context, Ta
 		row.push_back(Value(data_obj.value("timezone", "")));
 		result->rows.push_back(std::move(row));
 	}
-	
+
 	return std::move(result);
 }
 
 static void EcobiciSystemInfoFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
 	auto &data = data_p.bind_data->CastNoConst<EcobiciSystemInfoBindData>();
 	idx_t count = 0;
-	
+
 	while (data.offset < data.rows.size() && count < STANDARD_VECTOR_SIZE) {
 		for (idx_t col = 0; col < output.ColumnCount(); col++) {
 			output.SetValue(col, count, data.rows[data.offset][col]);
@@ -184,20 +183,23 @@ static void EcobiciSystemInfoFunction(ClientContext &context, TableFunctionInput
 		data.offset++;
 		count++;
 	}
-	
+
 	output.SetCardinality(count);
 }
 
 static void LoadInternal(ExtensionLoader &loader) {
 	// Register GBFS real-time data functions
-	TableFunction station_status_function("ecobici_station_status", {}, EcobiciStationStatusFunction, EcobiciStationStatusBind);
-	ExtensionUtil::RegisterFunction(loader.GetDatabase(), station_status_function);
-	
-	TableFunction station_info_function("ecobici_station_information", {}, EcobiciStationInfoFunction, EcobiciStationInfoBind);
-	ExtensionUtil::RegisterFunction(loader.GetDatabase(), station_info_function);
-	
-	TableFunction system_info_function("ecobici_system_information", {}, EcobiciSystemInfoFunction, EcobiciSystemInfoBind);
-	ExtensionUtil::RegisterFunction(loader.GetDatabase(), system_info_function);
+	TableFunction station_status_function("ecobici_station_status", {}, EcobiciStationStatusFunction,
+	                                      EcobiciStationStatusBind);
+	loader.RegisterFunction(station_status_function);
+
+	TableFunction station_info_function("ecobici_station_information", {}, EcobiciStationInfoFunction,
+	                                    EcobiciStationInfoBind);
+	loader.RegisterFunction(station_info_function);
+
+	TableFunction system_info_function("ecobici_system_information", {}, EcobiciSystemInfoFunction,
+	                                   EcobiciSystemInfoBind);
+	loader.RegisterFunction(system_info_function);
 }
 
 void EcobiciExtension::Load(ExtensionLoader &loader) {

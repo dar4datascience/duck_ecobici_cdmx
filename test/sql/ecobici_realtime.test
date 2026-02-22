@@ -1,6 +1,6 @@
 # name: test/sql/ecobici_realtime.test
 # description: Test Ecobici real-time GBFS data functions
-# group: [ecobici]
+# group: [sql]
 
 # Load the extension
 statement ok
