@@ -10,8 +10,20 @@ find_package(OpenSSL REQUIRED)
 
 # httplib and nlohmann_json are optional for tidy-check
 if(NOT CLANG_TIDY)
-    find_package(httplib REQUIRED)
-    find_package(nlohmann_json REQUIRED)
+    # Try to find packages via CMake config first (vcpkg)
+    find_package(httplib QUIET)
+    find_package(nlohmann_json QUIET)
+    
+    # If not found, use system includes (apt packages)
+    if(NOT httplib_FOUND)
+        message(STATUS "Using system httplib from /usr/include")
+        set(httplib_FOUND TRUE)
+    endif()
+    
+    if(NOT nlohmann_json_FOUND)
+        message(STATUS "Using system nlohmann_json from /usr/include")
+        set(nlohmann_json_FOUND TRUE)
+    endif()
 else()
     find_package(httplib QUIET)
     find_package(nlohmann_json QUIET)
@@ -32,12 +44,22 @@ build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 
-# Link httplib and nlohmann_json if found
+# Link httplib if found
 if(TARGET httplib::httplib)
+    # vcpkg provides a target
     target_link_libraries(${EXTENSION_NAME} httplib::httplib)
     target_link_libraries(${LOADABLE_EXTENSION_NAME} httplib::httplib)
+else()
+    # System package - link the shared library directly
+    find_library(HTTPLIB_LIBRARY NAMES cpp-httplib)
+    if(HTTPLIB_LIBRARY)
+        message(STATUS "Linking system cpp-httplib: ${HTTPLIB_LIBRARY}")
+        target_link_libraries(${EXTENSION_NAME} ${HTTPLIB_LIBRARY})
+        target_link_libraries(${LOADABLE_EXTENSION_NAME} ${HTTPLIB_LIBRARY})
+    endif()
 endif()
 
+# nlohmann_json is header-only, no linking needed
 if(TARGET nlohmann_json::nlohmann_json)
     target_link_libraries(${EXTENSION_NAME} nlohmann_json::nlohmann_json)
     target_link_libraries(${LOADABLE_EXTENSION_NAME} nlohmann_json::nlohmann_json)

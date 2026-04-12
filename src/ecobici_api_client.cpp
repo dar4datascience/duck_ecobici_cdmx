@@ -4,6 +4,7 @@
 #include <httplib.h>
 #include <sstream>
 #include <iomanip>
+#include <chrono>
 
 namespace duckdb {
 
@@ -13,8 +14,8 @@ EcobiciAPIClient::EcobiciAPIClient() {
 std::string EcobiciAPIClient::FetchGBFSFeed(const std::string &feed_name) {
 	httplib::Client cli("https://gbfs.mex.lyftbikes.com");
 	cli.set_follow_location(true);
-	cli.set_connection_timeout(10, 0);
-	cli.set_read_timeout(30, 0);
+	cli.set_connection_timeout(std::chrono::seconds(10));
+	cli.set_read_timeout(std::chrono::seconds(30));
 
 	std::string path = "/gbfs/en/" + feed_name + ".json";
 	auto res = cli.Get(path.c_str());
@@ -33,8 +34,8 @@ std::string EcobiciAPIClient::FetchGBFSFeed(const std::string &feed_name) {
 std::string EcobiciAPIClient::FetchHistoricalCSV(int year, int month) {
 	httplib::Client cli("https://ecobici.cdmx.gob.mx");
 	cli.set_follow_location(true);
-	cli.set_connection_timeout(10, 0);
-	cli.set_read_timeout(60, 0);
+	cli.set_connection_timeout(std::chrono::seconds(10));
+	cli.set_read_timeout(std::chrono::seconds(60));
 
 	std::ostringstream path_stream;
 	path_stream << "/wp-content/uploads/" << year << "/" << std::setfill('0') << std::setw(2) << month << "/" << year
