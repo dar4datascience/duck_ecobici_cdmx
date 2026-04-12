@@ -11,12 +11,33 @@ A DuckDB extension for querying Ecobici (CDMX bike-sharing system) data directly
 
 ## Installation
 
-### Building from Source
+### Option 1: Download Pre-built Extension (Recommended)
+
+Download the extension binary from the [GitHub Releases](https://github.com/dar4datascience/duck_ecobici_cdmx/releases/latest) page.
+
+```bash
+# Download the latest release
+wget https://github.com/dar4datascience/duck_ecobici_cdmx/releases/download/v0.1.0/ecobici.duckdb_extension
+
+# Load in DuckDB (requires -unsigned flag for unsigned extensions)
+duckdb -unsigned
+> LOAD 'ecobici.duckdb_extension';
+```
+
+**Platform-specific downloads:**
+- Linux: `ecobici.duckdb_extension-linux-amd64`
+- macOS: `ecobici.duckdb_extension-osx-universal`
+- Windows: `ecobici.duckdb_extension-windows-amd64`
+
+### Option 2: Build from Source
 
 ```bash
 # Clone the repository with submodules
 git clone --recurse-submodules https://github.com/dar4datascience/duck_ecobici_cdmx.git
 cd duck_ecobici_cdmx
+
+# Install dependencies (Ubuntu/Debian)
+sudo apt-get install -y libcpp-httplib-dev nlohmann-json3-dev libssl-dev
 
 # Build the extension
 make release
@@ -28,7 +49,25 @@ make release
 ### Loading the Extension
 
 ```sql
-LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+-- Load the extension (requires -unsigned flag for unsigned extensions)
+LOAD 'ecobici.duckdb_extension';
+
+-- Or load with full path
+LOAD '/path/to/ecobici.duckdb_extension';
+```
+
+**Important:** Since this extension is not signed, you must start DuckDB with the `-unsigned` flag:
+```bash
+duckdb -unsigned
+```
+
+### Option 3: Install from GitHub Release (Future)
+
+Once the extension is published to the DuckDB community registry, you can install it directly:
+
+```sql
+INSTALL ecobici FROM 'https://github.com/dar4datascience/duck_ecobici_cdmx/releases';
+LOAD ecobici;
 ```
 
 ## Available Functions
@@ -305,6 +344,10 @@ See LICENSE file for details.
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Publishing
+
+See [PUBLISHING_GUIDE.md](PUBLISHING_GUIDE.md) for instructions on how to publish this extension to the DuckDB community extensions list.
 
 ## Acknowledgments
 
