@@ -269,6 +269,35 @@ make test
 build/release/test/unittest "test/sql/ecobici_realtime.test"
 ```
 
+### Integration Testing
+
+We provide integration tests that verify the extension works with a real DuckDB installation:
+
+```bash
+# Quick smoke test (requires DuckDB CLI installed)
+./test/integration/smoke_test.sh
+
+# Or specify path to DuckDB
+./test/integration/smoke_test.sh /path/to/duckdb
+```
+
+The smoke test verifies:
+- ✅ Extension loading
+- ✅ All GBFS functions (real-time data)
+- ✅ Historical data functions
+- ✅ JOIN operations
+- ✅ Error handling
+- ✅ Complex analytical queries
+
+See `test/integration/README.md` for more details.
+
+### Continuous Integration
+
+All tests run automatically on GitHub Actions for every push and pull request:
+- **Code Quality**: Format and tidy checks
+- **Unit Tests**: SQL test files on all platforms
+- **Integration Tests**: Real DuckDB installation tests on Linux, macOS, and Windows
+
 ## License
 
 See LICENSE file for details.

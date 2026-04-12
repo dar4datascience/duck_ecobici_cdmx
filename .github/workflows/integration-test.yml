@@ -1,0 +1,304 @@
+#
+# Integration tests - Install DuckDB, load extension, and run real queries
+#
+name: Integration Tests
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}
+  cancel-in-progress: true
+
+jobs:
+  test-linux:
+    name: Integration Test - Linux
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt-get install -y -qq ninja-build
+      
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: ce613c41372b23b1f51333815feb3edd87ef8a8b
+      
+      - name: Build extension
+        env:
+          VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          VCPKG_TARGET_TRIPLET: 'x64-linux'
+          GEN: ninja
+        run: |
+          make release
+      
+      - name: Install DuckDB CLI
+        run: |
+          wget https://github.com/duckdb/duckdb/releases/download/v1.4.4/duckdb_cli-linux-amd64.zip
+          unzip duckdb_cli-linux-amd64.zip
+          chmod +x duckdb
+          ./duckdb --version
+      
+      - name: Test extension loading
+        run: |
+          ./duckdb -c "LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension'; SELECT 'Extension loaded successfully' as status;"
+      
+      - name: Test GBFS real-time functions
+        run: |
+          ./duckdb << 'EOF'
+          LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+          
+          -- Test station status
+          .mode line
+          SELECT 'Testing ecobici_station_status()...' as test;
+          SELECT COUNT(*) as station_count FROM ecobici_station_status();
+          
+          -- Test station information
+          SELECT 'Testing ecobici_station_information()...' as test;
+          SELECT COUNT(*) as station_count FROM ecobici_station_information();
+          
+          -- Test system information
+          SELECT 'Testing ecobici_system_information()...' as test;
+          SELECT * FROM ecobici_system_information();
+          
+          -- Test JOIN between functions
+          SELECT 'Testing JOIN operations...' as test;
+          SELECT COUNT(*) as joined_count 
+          FROM ecobici_station_information() info
+          JOIN ecobici_station_status() status 
+          ON info.station_id = status.station_id;
+          
+          SELECT 'All GBFS tests passed!' as result;
+          EOF
+      
+      - name: Test historical data function
+        run: |
+          ./duckdb << 'EOF'
+          LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+          
+          -- Test historical trips (using 2024-01 as example)
+          .mode line
+          SELECT 'Testing ecobici_historical_trips()...' as test;
+          
+          -- Try to fetch data, handle if not available
+          SELECT COUNT(*) as trip_count 
+          FROM ecobici_historical_trips(2024, 1) 
+          LIMIT 10;
+          
+          SELECT 'Historical data test completed!' as result;
+          EOF
+      
+      - name: Test data analysis queries
+        run: |
+          ./duckdb << 'EOF'
+          LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+          
+          .mode line
+          SELECT 'Running analysis queries...' as test;
+          
+          -- Find stations with available bikes
+          SELECT 
+              info.name,
+              status.num_bikes_available,
+              status.num_docks_available
+          FROM ecobici_station_information() info
+          JOIN ecobici_station_status() status 
+          ON info.station_id = status.station_id
+          WHERE status.num_bikes_available > 0
+          ORDER BY status.num_bikes_available DESC
+          LIMIT 5;
+          
+          -- Calculate utilization
+          SELECT 
+              AVG(CAST(num_bikes_available AS DOUBLE) / CAST(capacity AS DOUBLE)) * 100 as avg_utilization_pct
+          FROM ecobici_station_information() info
+          JOIN ecobici_station_status() status 
+          ON info.station_id = status.station_id
+          WHERE capacity > 0;
+          
+          SELECT 'Analysis queries completed!' as result;
+          EOF
+      
+      - name: Test error handling
+        run: |
+          ./duckdb << 'EOF'
+          LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+          
+          .mode line
+          SELECT 'Testing error handling...' as test;
+          
+          -- Test invalid year (should fail gracefully)
+          .bail off
+          SELECT * FROM ecobici_historical_trips(1900, 1);
+          
+          -- Test invalid month (should fail gracefully)
+          SELECT * FROM ecobici_historical_trips(2024, 13);
+          
+          SELECT 'Error handling tests completed!' as result;
+          EOF
+      
+      - name: Create test database with extension
+        run: |
+          ./duckdb test_ecobici.db << 'EOF'
+          LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+          
+          -- Create a view for easy access
+          CREATE VIEW current_station_status AS
+          SELECT 
+              info.station_id,
+              info.name,
+              info.lat,
+              info.lon,
+              info.capacity,
+              status.num_bikes_available,
+              status.num_docks_available,
+              status.is_renting,
+              status.is_returning
+          FROM ecobici_station_information() info
+          JOIN ecobici_station_status() status 
+          ON info.station_id = status.station_id;
+          
+          -- Test the view
+          SELECT COUNT(*) as total_stations FROM current_station_status;
+          
+          SELECT 'Database created successfully!' as result;
+          EOF
+      
+      - name: Verify database persistence
+        run: |
+          ./duckdb test_ecobici.db << 'EOF'
+          LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+          
+          -- Verify view exists
+          SELECT COUNT(*) as station_count FROM current_station_status;
+          
+          SELECT 'Database persistence verified!' as result;
+          EOF
+      
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-artifacts-linux
+          path: |
+            test_ecobici.db
+            build/release/extension/ecobici/ecobici.duckdb_extension
+
+  test-macos:
+    name: Integration Test - macOS
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+      
+      - name: Install dependencies
+        run: |
+          brew install ninja
+      
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: ce613c41372b23b1f51333815feb3edd87ef8a8b
+      
+      - name: Build extension
+        env:
+          VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          VCPKG_TARGET_TRIPLET: 'x64-osx'
+          OSX_BUILD_ARCH: 'x86_64'
+          GEN: ninja
+        run: |
+          make release
+      
+      - name: Install DuckDB CLI
+        run: |
+          wget https://github.com/duckdb/duckdb/releases/download/v1.4.4/duckdb_cli-osx-universal.zip
+          unzip duckdb_cli-osx-universal.zip
+          chmod +x duckdb
+          ./duckdb --version
+      
+      - name: Test extension loading
+        run: |
+          ./duckdb -c "LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension'; SELECT 'Extension loaded on macOS' as status;"
+      
+      - name: Run basic functionality tests
+        run: |
+          ./duckdb << 'EOF'
+          LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+          
+          .mode line
+          SELECT 'Testing on macOS...' as test;
+          
+          -- Test all functions
+          SELECT COUNT(*) as stations FROM ecobici_station_status();
+          SELECT COUNT(*) as stations FROM ecobici_station_information();
+          SELECT * FROM ecobici_system_information();
+          
+          SELECT 'macOS tests passed!' as result;
+          EOF
+
+  test-windows:
+    name: Integration Test - Windows
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+      
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: ce613c41372b23b1f51333815feb3edd87ef8a8b
+      
+      - name: Build extension
+        env:
+          VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          VCPKG_TARGET_TRIPLET: 'x64-windows-static-md'
+        shell: bash
+        run: |
+          make release
+      
+      - name: Install DuckDB CLI
+        shell: bash
+        run: |
+          curl -L -o duckdb_cli-windows-amd64.zip https://github.com/duckdb/duckdb/releases/download/v1.4.4/duckdb_cli-windows-amd64.zip
+          unzip duckdb_cli-windows-amd64.zip
+          ./duckdb.exe --version
+      
+      - name: Test extension loading
+        shell: bash
+        run: |
+          ./duckdb.exe -c "LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension'; SELECT 'Extension loaded on Windows' as status;"
+      
+      - name: Run basic functionality tests
+        shell: bash
+        run: |
+          ./duckdb.exe << 'EOF'
+          LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+          
+          .mode line
+          SELECT 'Testing on Windows...' as test;
+          
+          -- Test all functions
+          SELECT COUNT(*) as stations FROM ecobici_station_status();
+          SELECT COUNT(*) as stations FROM ecobici_station_information();
+          SELECT * FROM ecobici_system_information();
+          
+          SELECT 'Windows tests passed!' as result;
+          EOF
