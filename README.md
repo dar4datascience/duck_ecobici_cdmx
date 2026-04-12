@@ -87,6 +87,49 @@ Returns system-level information about Ecobici.
 SELECT * FROM ecobici_system_information();
 ```
 
+### Historical Trip Data Functions
+
+#### `ecobici_historical_trips(year, month)`
+
+Fetches historical trip data for a specific month from the Ecobici open data platform.
+
+**Parameters:**
+- `year` (INTEGER): Year (2010-2100)
+- `month` (INTEGER): Month (1-12)
+
+**Columns:**
+- `Genero_Usuario` (VARCHAR): User gender
+- `Edad_Usuario` (INTEGER): User age
+- `Bici` (VARCHAR): Bike ID
+- `Ciclo_Estacion_Retiro` (VARCHAR): Start station name
+- `Fecha_Retiro` (VARCHAR): Start date/time
+- `Ciclo_Estacion_Arribo` (VARCHAR): End station name
+- `Fecha_Arribo` (VARCHAR): End date/time
+
+**Example:**
+```sql
+-- Get all trips from January 2024
+SELECT * FROM ecobici_historical_trips(2024, 1) LIMIT 100;
+
+-- Count trips by gender
+SELECT Genero_Usuario, COUNT(*) as trip_count
+FROM ecobici_historical_trips(2024, 1)
+GROUP BY Genero_Usuario;
+
+-- Find most popular routes
+SELECT 
+    Ciclo_Estacion_Retiro as start_station,
+    Ciclo_Estacion_Arribo as end_station,
+    COUNT(*) as trip_count
+FROM ecobici_historical_trips(2024, 1)
+GROUP BY start_station, end_station
+ORDER BY trip_count DESC
+LIMIT 10;
+```
+
+**Note:** Historical CSV data is available from 2023 onwards. The URL pattern follows:
+`https://ecobici.cdmx.gob.mx/wp-content/uploads/{YYYY}/{MM}/{YYYY-MM}.csv`
+
 ## Example Queries
 
 ### Find stations with available bikes
@@ -134,11 +177,62 @@ WHERE info.capacity > 0
 ORDER BY bike_fill_percentage DESC;
 ```
 
+### Historical trip analysis
+
+```sql
+-- Trip duration analysis by age group
+SELECT 
+    CASE 
+        WHEN Edad_Usuario < 20 THEN 'Under 20'
+        WHEN Edad_Usuario BETWEEN 20 AND 30 THEN '20-30'
+        WHEN Edad_Usuario BETWEEN 31 AND 40 THEN '31-40'
+        WHEN Edad_Usuario BETWEEN 41 AND 50 THEN '41-50'
+        ELSE 'Over 50'
+    END as age_group,
+    COUNT(*) as trip_count,
+    AVG(Edad_Usuario) as avg_age
+FROM ecobici_historical_trips(2024, 1)
+WHERE Edad_Usuario IS NOT NULL
+GROUP BY age_group
+ORDER BY trip_count DESC;
+```
+
+### Combining real-time and historical data
+
+```sql
+-- Find stations that are currently busy and were popular last month
+WITH popular_stations AS (
+    SELECT 
+        Ciclo_Estacion_Retiro as station_name,
+        COUNT(*) as historical_trips
+    FROM ecobici_historical_trips(2024, 1)
+    GROUP BY station_name
+    ORDER BY historical_trips DESC
+    LIMIT 20
+)
+SELECT 
+    info.name,
+    info.address,
+    status.num_bikes_available,
+    status.num_docks_available,
+    ps.historical_trips
+FROM ecobici_station_information() info
+JOIN ecobici_station_status() status ON info.station_id = status.station_id
+JOIN popular_stations ps ON info.name LIKE '%' || ps.station_name || '%'
+WHERE status.num_bikes_available < 3
+ORDER BY ps.historical_trips DESC;
+```
+
 ## Data Sources
 
 - **GBFS Real-time Data**: https://gbfs.mex.lyftbikes.com/gbfs/en/
+  - Live station status, station information, system information
+  - Updates in real-time following GBFS specification
 - **GBFS Specification**: https://github.com/NABSA/gbfs
-- **Ecobici Open Data**: https://ecobici.cdmx.gob.mx/
+- **Ecobici Historical Data**: https://ecobici.cdmx.gob.mx/datos-abiertos/
+  - Monthly CSV files with trip data
+  - Available from 2023 onwards
+  - Includes user demographics, trip times, and station information
 
 ## Development
 

@@ -1,0 +1,58 @@
+# name: test/sql/ecobici_historical.test
+# description: Test Ecobici historical trip data functions
+# group: [sql]
+
+# Require the extension
+require ecobici
+
+# Load the extension
+statement ok
+LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
+
+# Test historical trips function with valid parameters
+# Note: This test may fail if the specific month's data is not available
+# Using a recent month that should have data
+statement ok
+SELECT * FROM ecobici_historical_trips(2024, 1) LIMIT 1;
+
+# Test that historical trips has expected columns
+query I
+SELECT COUNT(*) FROM (
+    SELECT Genero_Usuario, Edad_Usuario, Bici, Ciclo_Estacion_Retiro, 
+           Fecha_Retiro, Ciclo_Estacion_Arribo, Fecha_Arribo
+    FROM ecobici_historical_trips(2024, 1) 
+    LIMIT 1
+) WHERE Genero_Usuario IS NOT NULL OR Genero_Usuario IS NULL;
+----
+1
+
+# Test parameter validation - invalid year
+statement error
+SELECT * FROM ecobici_historical_trips(1900, 1);
+----
+Year must be between 2010 and 2100
+
+# Test parameter validation - invalid month (too low)
+statement error
+SELECT * FROM ecobici_historical_trips(2024, 0);
+----
+Month must be between 1 and 12
+
+# Test parameter validation - invalid month (too high)
+statement error
+SELECT * FROM ecobici_historical_trips(2024, 13);
+----
+Month must be between 1 and 12
+
+# Test data aggregation - count trips by gender
+statement ok
+SELECT Genero_Usuario, COUNT(*) as trip_count
+FROM ecobici_historical_trips(2024, 1)
+GROUP BY Genero_Usuario
+LIMIT 10;
+
+# Test data filtering - trips from specific station
+statement ok
+SELECT * FROM ecobici_historical_trips(2024, 1)
+WHERE Ciclo_Estacion_Retiro LIKE '%Reforma%'
+LIMIT 5;
