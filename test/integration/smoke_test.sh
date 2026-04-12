@@ -40,7 +40,7 @@ echo ""
 
 # Test 1: Load extension
 echo -e "${YELLOW}Test 1: Loading extension...${NC}"
-$DUCKDB -c "LOAD '$EXTENSION_PATH'; SELECT 'OK' as status;" > /dev/null 2>&1
+$DUCKDB -unsigned -c "LOAD '$EXTENSION_PATH'; SELECT 'OK' as status;" > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Extension loaded successfully${NC}"
 else
@@ -50,7 +50,7 @@ fi
 
 # Test 2: Station status
 echo -e "${YELLOW}Test 2: Testing ecobici_station_status()...${NC}"
-RESULT=$($DUCKDB -c "LOAD '$EXTENSION_PATH'; SELECT COUNT(*) FROM ecobici_station_status();" 2>&1)
+RESULT=$($DUCKDB -unsigned -c "LOAD '$EXTENSION_PATH'; SELECT COUNT(*) FROM ecobici_station_status();" 2>&1)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Station status: $RESULT stations${NC}"
 else
@@ -61,7 +61,7 @@ fi
 
 # Test 3: Station information
 echo -e "${YELLOW}Test 3: Testing ecobici_station_information()...${NC}"
-RESULT=$($DUCKDB -c "LOAD '$EXTENSION_PATH'; SELECT COUNT(*) FROM ecobici_station_information();" 2>&1)
+RESULT=$($DUCKDB -unsigned -c "LOAD '$EXTENSION_PATH'; SELECT COUNT(*) FROM ecobici_station_information();" 2>&1)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Station information: $RESULT stations${NC}"
 else
@@ -71,7 +71,7 @@ fi
 
 # Test 4: System information
 echo -e "${YELLOW}Test 4: Testing ecobici_system_information()...${NC}"
-RESULT=$($DUCKDB -c "LOAD '$EXTENSION_PATH'; SELECT name FROM ecobici_system_information();" 2>&1)
+RESULT=$($DUCKDB -unsigned -c "LOAD '$EXTENSION_PATH'; SELECT name FROM ecobici_system_information();" 2>&1)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ System information: $RESULT${NC}"
 else
@@ -81,7 +81,7 @@ fi
 
 # Test 5: JOIN operations
 echo -e "${YELLOW}Test 5: Testing JOIN operations...${NC}"
-RESULT=$($DUCKDB -c "LOAD '$EXTENSION_PATH'; SELECT COUNT(*) FROM ecobici_station_information() info JOIN ecobici_station_status() status ON info.station_id = status.station_id;" 2>&1)
+RESULT=$($DUCKDB -unsigned -c "LOAD '$EXTENSION_PATH'; SELECT COUNT(*) FROM ecobici_station_information() info JOIN ecobici_station_status() status ON info.station_id = status.station_id;" 2>&1)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ JOIN operations: $RESULT joined rows${NC}"
 else
@@ -91,7 +91,7 @@ fi
 
 # Test 6: Historical data (may fail if data not available)
 echo -e "${YELLOW}Test 6: Testing ecobici_historical_trips()...${NC}"
-$DUCKDB -c "LOAD '$EXTENSION_PATH'; SELECT COUNT(*) FROM ecobici_historical_trips(2024, 1) LIMIT 1;" > /dev/null 2>&1
+$DUCKDB -unsigned -c "LOAD '$EXTENSION_PATH'; SELECT COUNT(*) FROM ecobici_historical_trips(2024, 1) LIMIT 1;" > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Historical trips function works${NC}"
 else
@@ -100,7 +100,7 @@ fi
 
 # Test 7: Error handling
 echo -e "${YELLOW}Test 7: Testing error handling...${NC}"
-$DUCKDB -c "LOAD '$EXTENSION_PATH'; SELECT * FROM ecobici_historical_trips(1900, 1);" > /dev/null 2>&1
+$DUCKDB -unsigned -c "LOAD '$EXTENSION_PATH'; SELECT * FROM ecobici_historical_trips(1900, 1);" > /dev/null 2>&1
 if [ $? -ne 0 ]; then
     echo -e "${GREEN}✓ Error handling works (invalid year rejected)${NC}"
 else
@@ -110,7 +110,7 @@ fi
 
 # Test 8: Complex query
 echo -e "${YELLOW}Test 8: Testing complex analytical query...${NC}"
-$DUCKDB << 'EOF' > /dev/null 2>&1
+$DUCKDB -unsigned << 'EOF' > /dev/null 2>&1
 LOAD 'build/release/extension/ecobici/ecobici.duckdb_extension';
 SELECT 
     info.name,
